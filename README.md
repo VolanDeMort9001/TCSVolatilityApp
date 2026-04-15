@@ -2,7 +2,11 @@
 
 # data/
 
-data/raw/prices.csv - сырые данные цен акций TCS Group
+data/raw/tcs_prices.csv - сырые данные цен акций TCS Group
+
+data/raw/moex_prices.csv - сырые данные цен индекса MOEX
+
+data/raw/combined_prices.csv - сырые объединенные данные цен индекса MOEX и TCS Group
 
 data/raw/news_raw.csv - данные из новостей (по сути, необработанные новости)
 
