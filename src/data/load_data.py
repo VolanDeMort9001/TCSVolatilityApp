@@ -4,7 +4,7 @@ import numpy as np
 import yfinance as yf
 from datetime import datetime
 
-DATA_DIR = "/Users/aleknazarov9001/PycharmProjects/TCSVolatilityApp/data/raw/"
+DATA_DIR = os.getenv("DATA_DIR") + "raw"
 TICKER = "TCSG.ME"
 MOEX_TICKER = "IMOEX.ME"
 

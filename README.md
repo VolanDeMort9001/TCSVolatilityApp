@@ -10,6 +10,8 @@ data/raw/combined_prices.csv - сырые объединенные данные 
 
 data/raw/news_raw.csv - данные из новостей (по сути, необработанные новости)
 
+data/preprocessed/news_sentiment.csv - обработанные значения коэффициента настроения статей из news_raw.csv
+
 data/preprocessed/dataset.csv - хранение финального датасета для обучения модели
 
 # notebooks/
