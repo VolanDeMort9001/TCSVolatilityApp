@@ -1,35 +1,72 @@
 import os
 import pandas as pd
 import numpy as np
-import yfinance as yf
 from datetime import datetime
+from dotenv import load_dotenv
+import requests
 
-DATA_DIR = os.getenv("DATA_DIR") + "raw"
-TICKER = "TCSG.ME"
-MOEX_TICKER = "IMOEX.ME"
+load_dotenv()
 
-START_DATE = "2015-01-01"
+DATA_DIR = os.getenv("DATA_DIR") + "/data/raw"
+OLD_TICKER = "TCSG"
+NEW_TICKER = "T"
+MOEX_TICKER = "MOEX"
+
+START_DATE = "2024-01-01"
 END_DATE = datetime.today().strftime('%Y-%m-%d')
+
+def load_moex_data(security: str):
+    url = f"https://iss.moex.com/iss/history/engines/stock/markets/shares/securities/{security}.json"
+
+    all_data = []
+    start = 0
+
+    while True:
+        params = {
+            "from": START_DATE,
+            "till": END_DATE,
+            "start": start,
+            "iss.meta": "off",
+            "iss.only": "history",
+            "history.columns": "TRADEDATE,CLOSE,VOLUME"
+        }
+
+        response = requests.get(url, params=params)
+        data = response.json()
+
+        history = data["history"]["data"]
+        columns = data["history"]["columns"]
+
+        if not history:
+            break
+
+        df_part = pd.DataFrame(history, columns=columns)
+        all_data.append(df_part)
+
+        print(f"Загружено строк: {len(df_part)} (start={start})")
+
+        start += 100
+
+    df = pd.concat(all_data, ignore_index=True)
+
+    df.columns = ["date", "price", "volume"]
+    df["date"] = pd.to_datetime(df["date"])
+
+    df = df.sort_values("date")
+    df = df.dropna()
+
+    return df
 
 
 def load_price_data(ticker: str) -> pd.DataFrame:
     """
     Загружает исторические данные по тикеру через yfinance
     """
-    data = yf.download(
-        ticker,
-        start=START_DATE,
-        end=END_DATE,
-        progress=False
-    )
+    data = load_moex_data(ticker)
     if data.empty:
         raise ValueError(f"Нет данных для тикера {ticker}")
 
     data = data.reset_index()
-
-    # Оставляем нужные колонки
-    data = data[["Date", "Close", "Volume"]]
-    data.columns = ["date", "price", "volume"]
     return data
 
 
@@ -67,13 +104,16 @@ def save_data(df: pd.DataFrame, filename: str):
     Сохраняет DataFrame в CSV
     """
     path = os.path.join(DATA_DIR, filename)
-    print(path)
     df.to_csv(path, index=False)
 
 
 def main():
     moex_df = prepare_price_dataset(MOEX_TICKER, "MOEX")
-    tcs_df = prepare_price_dataset(TICKER, "TCSG")
+    moex_df = moex_df.drop_duplicates(subset=["date"])
+    moex_df = moex_df.drop(columns=["index"], errors="ignore")
+
+    tcs_df = pd.concat([prepare_price_dataset(OLD_TICKER, OLD_TICKER), prepare_price_dataset(NEW_TICKER, NEW_TICKER)], axis=0)
+    tcs_df = tcs_df.drop(columns=["index"], errors="ignore")
 
     save_data(tcs_df, "tcs_prices.csv")
     save_data(moex_df, "moex_prices.csv")

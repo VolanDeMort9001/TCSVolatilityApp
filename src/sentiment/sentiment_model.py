@@ -8,8 +8,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-INPUT_PATH = os.getenv("DATA_DIR") + "raw/news_raw.csv"
-OUTPUT_PATH = os.getenv("DATA_DIR") + "preprocessed/news_sentiment.csv"
+INPUT_PATH = os.getenv("DATA_DIR") + "/data/raw/news_raw.csv"
+OUTPUT_PATH = os.getenv("DATA_DIR") + "/data/preprocessed/news_sentiment.csv"
 
 def load_model():
     sentiment_model = pipeline(
