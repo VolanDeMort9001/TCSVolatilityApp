@@ -15,7 +15,7 @@ MOEX_TICKER = "MOEX"
 START_DATE = "2024-01-01"
 END_DATE = datetime.today().strftime('%Y-%m-%d')
 
-def load_moex_data(security: str):
+def load_moex_data(security: str, name: str):
     url = f"https://iss.moex.com/iss/history/engines/stock/markets/shares/securities/{security}.json"
 
     all_data = []
@@ -49,7 +49,7 @@ def load_moex_data(security: str):
 
     df = pd.concat(all_data, ignore_index=True)
 
-    df.columns = ["date", "price", "volume"]
+    df.columns = ["date", f"price_{name}", f"volume_{name}"]
     df["date"] = pd.to_datetime(df["date"])
 
     df = df.sort_values("date")
@@ -58,11 +58,11 @@ def load_moex_data(security: str):
     return df
 
 
-def load_price_data(ticker: str) -> pd.DataFrame:
+def load_price_data(ticker: str, name: str) -> pd.DataFrame:
     """
     Загружает исторические данные по тикеру через yfinance
     """
-    data = load_moex_data(ticker)
+    data = load_moex_data(ticker, name)
     if data.empty:
         raise ValueError(f"Нет данных для тикера {ticker}")
 
@@ -70,19 +70,19 @@ def load_price_data(ticker: str) -> pd.DataFrame:
     return data
 
 
-def compute_returns(df: pd.DataFrame) -> pd.DataFrame:
+def compute_returns(df: pd.DataFrame, ticker: str) -> pd.DataFrame:
     """
     Считает лог-доходности
     """
-    df["log_return"] = np.log(df["price"] / df["price"].shift(1))
+    df[f"log_return_{ticker}"] = np.log(df[f"price_{ticker}"] / df[f"price_{ticker}"].shift(1))
     return df
 
 
-def compute_volatility(df: pd.DataFrame, window: int = 20) -> pd.DataFrame:
+def compute_volatility(df: pd.DataFrame, ticker: str, window: int = 20) -> pd.DataFrame:
     """
     Считает скользящую волатильность
     """
-    df["volatility"] = df["log_return"].rolling(window=window).std()
+    df[f"volatility_{ticker}"] = df[f"log_return_{ticker}"].rolling(window=window).std()
     return df
 
 
@@ -91,10 +91,9 @@ def prepare_price_dataset(ticker: str, name: str) -> pd.DataFrame:
     Полный пайплайн:
     загрузка -> доходности -> волатильность
     """
-    df = load_price_data(ticker)
-    df = compute_returns(df)
-    df = compute_volatility(df)
-    df["asset"] = name
+    df = load_price_data(ticker, name)
+    df = compute_returns(df, name)
+    df = compute_volatility(df, name)
 
     return df
 
@@ -112,13 +111,13 @@ def main():
     moex_df = moex_df.drop_duplicates(subset=["date"])
     moex_df = moex_df.drop(columns=["index"], errors="ignore")
 
-    tcs_df = pd.concat([prepare_price_dataset(OLD_TICKER, OLD_TICKER), prepare_price_dataset(NEW_TICKER, NEW_TICKER)], axis=0)
+    tcs_df = pd.concat([prepare_price_dataset(OLD_TICKER, OLD_TICKER), prepare_price_dataset(NEW_TICKER, OLD_TICKER)], axis=0)
     tcs_df = tcs_df.drop(columns=["index"], errors="ignore")
 
     save_data(tcs_df, "tcs_prices.csv")
     save_data(moex_df, "moex_prices.csv")
 
-    combined = pd.concat([tcs_df, moex_df], axis=0)
+    combined = pd.merge(tcs_df, moex_df, on="date", how="left")
     save_data(combined, "combined_prices.csv")
 
 

@@ -6,9 +6,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-PRICES_PATH = os.getenv("DATA_DIR") + "/data/raw/moex_prices.csv"
+PRICES_PATH = os.getenv("DATA_DIR") + "/data/raw/combined_prices.csv"
 SENTIMENT_PATH = os.getenv("DATA_DIR") + "/data/preprocessed/news_sentiment.csv"
 OUTPUT_PATH = os.getenv("DATA_DIR") + "/data/preprocessed/final_dataset.csv"
+LAG_DAYS = int(os.getenv("LAG_DAYS"))
 
 def load_data():
     prices = pd.read_csv(PRICES_PATH)
@@ -22,11 +23,14 @@ def merge_data(prices, news):
     df["news_count"] = df["news_count"].fillna(0)
     return df
 
-def add_features(df):
-    df["sentiment_mean_lag1"] = df["sentiment_mean"].shift(1)
-    df["sentiment_std_lag1"] = df["sentiment_std"].shift(1)
-    df["news_count_lag1"] = df["news_count"].shift(1)
-    df["return_lag1"] = df["log_return"].shift(1)
+def add_features(df, days: int = 10):
+    for lag in range(1, days + 1):
+        df[f"sentiment_mean_lag{lag}"] = df["sentiment_mean"].shift(lag)
+        df[f"sentiment_std_lag{lag}"] = df["sentiment_std"].shift(lag)
+        df[f"news_count_lag{lag}"] = df["news_count"].shift(lag)
+        df[f"TCSG_return_lag{lag}"] = df["log_return_TCSG"].shift(lag)
+        df[f"MOEX_return_lag{lag}"] = df["log_return_MOEX"].shift(lag)
+        df[f"MOEX_volatility_lag{lag}"] = df["volatility_MOEX"].shift(lag)
     return df
 
 def clean(df):
@@ -41,7 +45,7 @@ def main():
     df = merge_data(prices, news)
 
     print("Добавление новых фичей")
-    df = add_features(df)
+    df = add_features(df, LAG_DAYS)
 
     print("Очистка пустых строк")
     df = clean(df)
@@ -52,7 +56,6 @@ def main():
 
     os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
     df.to_csv(OUTPUT_PATH, index=False)
-    print(f"Сохранено: {OUTPUT_PATH}")
 
 
 if __name__ == "__main__":
