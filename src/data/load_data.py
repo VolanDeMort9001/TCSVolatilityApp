@@ -12,8 +12,8 @@ OLD_TICKER = "TCSG"
 NEW_TICKER = "T"
 MOEX_TICKER = "MOEX"
 
-START_DATE = "2024-01-01"
-END_DATE = datetime.today().strftime('%Y-%m-%d')
+START_DATE = "2019-09-01"
+END_DATE = "2026-04-01"    #datetime.today().strftime('%Y-%m-%d')
 
 def load_moex_data(security: str, name: str):
     url = f"https://iss.moex.com/iss/history/engines/stock/markets/shares/securities/{security}.json"

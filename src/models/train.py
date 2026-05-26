@@ -14,9 +14,9 @@ PREDICT_DAYS = int(os.getenv("PREDICT_DAYS"))
 
 
 class PredictingModel:
-    def __init__(self, path: str, train_size=0.65, lag: int = 10):
+    def __init__(self, path: str, train_size=0.9, lag: int = 10):
         self.df = pd.read_csv(path)
-        self.tscv = TimeSeriesSplit(n_splits=6)
+        self.tscv = TimeSeriesSplit(n_splits=8)
         self.model = RandomForestRegressor(
             n_estimators=100,
             max_depth=5,
