@@ -8,89 +8,160 @@ from dotenv import load_dotenv
 load_dotenv()
 
 API_KEY = os.getenv("API_KEY")
-DATA_DIR = os.getenv("DATA_DIR") + "/data/raw"
+DATA_DIR = os.path.join(os.getenv("DATA_DIR", "."), "data", "raw")
 BASE_URL = os.getenv("BASE_URL")
 OUTPUT_FILE = "news_raw.csv"
-KEYWORDS = "TCS Group"
-DATE_FROM = (datetime.today() - timedelta(days=90)).strftime("%Y-%m-%d")
 
-MAX_PAGES = 34
+QUERY = """
+(
+"Т-Банк" OR
+"T-Bank" OR
+"TCS Group" OR
+"ТКС Групп" OR
+"Тинькофф"
+)
+"""
+
+DATE_FROM = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
+DATE_TO = datetime.utcnow().strftime("%Y-%m-%d")
+
+PAGE_SIZE = 100
 
 
 def ensure_data_dir():
-    if not os.path.exists(DATA_DIR):
-        os.makedirs(DATA_DIR)
+    os.makedirs(DATA_DIR, exist_ok=True)
 
 
-def fetch_news(page=1):
+def fetch_news(page: int):
     params = {
-        "q": KEYWORDS,
-        "lang": "en",
+        "q": QUERY,
+        "language": "ru",
         "from": DATE_FROM,
-        "sortby": "publishedAt",
-        "max": 10,
+        "to": DATE_TO,
+        "sortBy": "publishedAt",
+        "pageSize": PAGE_SIZE,
         "page": page,
-        "apikey": API_KEY
+        "apiKey": API_KEY,
     }
 
-    response = requests.get(BASE_URL, params=params)
-    print(f"STATUS: {response.status_code}")
+    headers = {
+        "User-Agent": "Mozilla/5.0"
+    }
+
+    response = requests.get(
+        BASE_URL,
+        params=params,
+        headers=headers,
+        timeout=30
+    )
+
+    print(
+        f"Page={page} "
+        f"Status={response.status_code}"
+    )
+
     if response.status_code != 200:
         print(response.text)
-        raise Exception("Ошибка API")
+        print(response.headers)
+        response.raise_for_status()
+
     return response.json()
 
 
 def parse_articles(data):
-    articles = []
+    rows = []
 
-    for item in data.get("articles", []):
-        articles.append({
-            "date": item.get("publishedAt", "")[:100],
-            "title": item.get("title", ""),
-            "text": (item.get("description") or "") + " " + (item.get("content") or ""),
-            "source": item.get("source", {}).get("name", "")
-        })
+    for article in data.get("articles", []):
 
-    return articles
+        rows.append(
+            {
+                "published_at": article.get("publishedAt"),
+                "title": article.get("title"),
+                "description": article.get("description"),
+                "content": article.get("content"),
+                "source": article.get("source", {}).get("name"),
+                "author": article.get("author"),
+                "url": article.get("url"),
+                "url_to_image": article.get("urlToImage"),
+            }
+        )
+
+    return rows
 
 
+def collect_news():
+    all_rows = []
 
-def collect_news(max_pages=MAX_PAGES):
-    all_articles = []
+    page = 1
 
-    for page in range(1, max_pages + 1):
-        print(f"\nЗапрос страницы {page}")
+    while True:
 
-        data = fetch_news(page=page)
-        parsed = parse_articles(data)
+        data = fetch_news(page)
 
-        if not parsed:
-            print("Нет данных, останавливаемся")
+        articles = parse_articles(data)
+
+        if not articles:
+            print("Статьи закончились")
             break
 
-        all_articles.extend(parsed)
+        all_rows.extend(articles)
+
+        total_results = data.get("totalResults", 0)
+
+        print(
+            f"Получено {len(articles)} статей "
+            f"(всего API сообщает {total_results})"
+        )
+
+        if len(articles) < PAGE_SIZE:
+            break
+
+        page += 1
+
         time.sleep(1)
 
-    df = pd.DataFrame(all_articles)
+    df = pd.DataFrame(all_rows)
 
-    if df.empty:
-        print("⚠️ Нет данных")
+    if not df.empty:
+        df.drop_duplicates(
+            subset=["url"],
+            inplace=True
+        )
 
     return df
 
-def save_news(df):
-    path = os.path.join(DATA_DIR, OUTPUT_FILE)
-    df.to_csv(path, index=False)
-    print(f"Сохранено: {path}")
 
+def save_news(df):
+
+    filepath = os.path.join(
+        DATA_DIR,
+        OUTPUT_FILE
+    )
+
+    df.to_csv(
+        filepath,
+        index=False,
+        encoding="utf-8-sig"
+    )
+
+    print(f"\nСохранено: {filepath}")
 
 
 def main():
+
+    if not API_KEY:
+        raise ValueError(
+            "NEWS_API_KEY не найден в .env"
+        )
+
     ensure_data_dir()
+
     df = collect_news()
-    print(f"\nСобрано новостей: {len(df)}")
+
+    print(f"\nВсего статей: {len(df)}")
+
     save_news(df)
+
 
 if __name__ == "__main__":
     main()
