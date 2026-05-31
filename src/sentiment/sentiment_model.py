@@ -38,18 +38,20 @@ def compute_sentiment(df, model):
             continue
 
         try:
-            result = model(text)[0]
-            label = result["label"]
-            score = result["score"]
-            if label == "positive":
+            result = model(text, top_k=None)
+            value = 0
+            for i in range(3):
+                if result[i]["label"] == "positive":
+                    value += result[i]["score"]
+                if result[i]["label"] == "negative":
+                    value -= result[i]["score"]
+            if value > 0.15:
                 sentiments.append("positive")
-                scores.append(score)
-            elif label == "negative":
+            elif value < -0.15:
                 sentiments.append("negative")
-                scores.append(-score)
             else:
                 sentiments.append("neutral")
-                scores.append(0.0)
+            scores.append(value)
 
         except Exception:
             sentiments.append("neutral")
