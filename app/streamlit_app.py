@@ -24,10 +24,11 @@ st.set_page_config(
 
 
 @st.cache_resource
-def load_model():
+def load_model(model_name: str = "RFR"):
     model = PredictingModel(
         path=DATA_PATH,
-        lag=LAG_DAYS
+        lag=LAG_DAYS,
+        model_name=model_name
     )
     model.fit()
     return model
@@ -42,7 +43,7 @@ def load_data():
 
     return df
 
-model = load_model()
+RFR_model = load_model(model_name="RFR")
 df = load_data()
 
 st.title("TCS Volatility Predictor")
@@ -52,32 +53,98 @@ st.markdown("""
 - новостного sentiment analysis
 - исторических данных TCSG и индекса MOEX
 """)
-st.subheader("Метрики модели")
 
-preds = model.evaluate(show_metrics=False)
-rmse = np.sqrt(np.mean((model.y_test - preds) ** 2))
-mae = np.mean(np.abs(model.y_test - preds))
+
+st.subheader("Метрики модели RandomForestRegressor")
+
+RFR_preds = RFR_model.evaluate(show_metrics=False)
+RFR_rmse = np.sqrt(np.mean((RFR_model.y_test - RFR_preds) ** 2))
+RFR_mae = np.mean(np.abs(RFR_model.y_test - RFR_preds))
 col1, col2 = st.columns(2)
 with col1:
-    st.metric("RMSE", f"{rmse:.6f}")
+    st.metric("RMSE", f"{RFR_rmse:.6f}")
 with col2:
-    st.metric("MAE", f"{mae:.6f}")
+    st.metric("MAE", f"{RFR_mae:.6f}")
 
-st.subheader(f"Прогноз на следующие {PREDICT_DAYS} дней")
-future_preds = model.predict_volatility(days=PREDICT_DAYS)
-future_df = pd.DataFrame({
+st.subheader(f"Прогноз на следующие {PREDICT_DAYS} дней на RandomForestRegressor")
+RFR_future_preds = RFR_model.predict_volatility(days=PREDICT_DAYS)
+RFR_future_df = pd.DataFrame({
     "Day": np.arange(1, PREDICT_DAYS + 1),
-    "Predicted Volatility": future_preds
+    "Predicted Volatility": RFR_future_preds
 })
-st.dataframe(future_df)
-forecast_fig = px.line(
-    future_df,
+
+st.dataframe(RFR_future_df)
+RFR_forecast_fig = px.line(
+    RFR_future_df,
     x="Day",
     y="Predicted Volatility",
     markers=True,
     title="Прогноз волатильности"
 )
-st.plotly_chart(forecast_fig, use_container_width=True)
+st.plotly_chart(RFR_forecast_fig, use_container_width=True)
+
+
+GBR_model = load_model(model_name="GBR")
+
+st.subheader("Метрики модели GradientBoostingRegressor")
+
+GBR_preds = GBR_model.evaluate(show_metrics=False)
+GBR_rmse = np.sqrt(np.mean((GBR_model.y_test - GBR_preds) ** 2))
+GBR_mae = np.mean(np.abs(GBR_model.y_test - GBR_preds))
+col1, col2 = st.columns(2)
+with col1:
+    st.metric("RMSE", f"{GBR_rmse:.6f}")
+with col2:
+    st.metric("MAE", f"{GBR_mae:.6f}")
+
+st.subheader(f"Прогноз на следующие {PREDICT_DAYS} дней на GradientBoostingRegressor")
+GBR_future_preds = GBR_model.predict_volatility(days=PREDICT_DAYS)
+GBR_future_df = pd.DataFrame({
+    "Day": np.arange(1, PREDICT_DAYS + 1),
+    "Predicted Volatility": GBR_future_preds
+})
+
+st.dataframe(GBR_future_df)
+GBR_forecast_fig = px.line(
+    GBR_future_df,
+    x="Day",
+    y="Predicted Volatility",
+    markers=True,
+    title="Прогноз волатильности"
+)
+st.plotly_chart(GBR_forecast_fig, use_container_width=True)
+
+
+AdaRegression_model = load_model(model_name="AdaRegression")
+
+st.subheader("Метрики модели GradientBoostingRegressor")
+
+AdaRegression_preds = AdaRegression_model.evaluate(show_metrics=False)
+AdaRegression_rmse = np.sqrt(np.mean((AdaRegression_model.y_test - AdaRegression_preds) ** 2))
+AdaRegression_mae = np.mean(np.abs(AdaRegression_model.y_test - AdaRegression_preds))
+col1, col2 = st.columns(2)
+with col1:
+    st.metric("RMSE", f"{AdaRegression_rmse:.6f}")
+with col2:
+    st.metric("MAE", f"{AdaRegression_mae:.6f}")
+
+st.subheader(f"Прогноз на следующие {PREDICT_DAYS} дней на GradientBoostingRegressor")
+AdaRegression_future_preds = AdaRegression_model.predict_volatility(days=PREDICT_DAYS)
+AdaRegression_future_df = pd.DataFrame({
+    "Day": np.arange(1, PREDICT_DAYS + 1),
+    "Predicted Volatility": AdaRegression_future_preds
+})
+
+st.dataframe(AdaRegression_future_df)
+AdaRegression_forecast_fig = px.line(
+    AdaRegression_future_df,
+    x="Day",
+    y="Predicted Volatility",
+    markers=True,
+    title="Прогноз волатильности"
+)
+st.plotly_chart(AdaRegression_forecast_fig, use_container_width=True)
+
 
 st.subheader("Историческая волатильность TCSG")
 if "date" in df.columns:
@@ -99,40 +166,109 @@ if "date" in df.columns:
     )
     st.plotly_chart(sentiment_fig, use_container_width=True)
 
-st.subheader("Важность признаков")
-importance_df = pd.DataFrame({
-    "feature": model.X.columns,
-    "importance": model.model.feature_importances_
+st.subheader("Важность признаков в RandomForestRegressor")
+RFR_importance_df = pd.DataFrame({
+    "feature": RFR_model.X.columns,
+    "importance": RFR_model.model.feature_importances_
 })
-importance_df = importance_df.sort_values(
+RFR_importance_df = RFR_importance_df.sort_values(
     "importance",
     ascending=False
 )
-importance_fig = px.bar(
-    importance_df.head(15),
+RFR_importance_fig = px.bar(
+    RFR_importance_df.head(15),
     x="importance",
     y="feature",
     orientation="h",
     title="Top-15 признаков"
 )
-st.plotly_chart(importance_fig, use_container_width=True)
+st.plotly_chart(RFR_importance_fig, use_container_width=True)
+
+st.subheader("Важность признаков в GradientBoostRegressor")
+GBR_importance_df = pd.DataFrame({
+    "feature": GBR_model.X.columns,
+    "importance": GBR_model.model.feature_importances_
+})
+GBR_importance_df = GBR_importance_df.sort_values(
+    "importance",
+    ascending=False
+)
+GBR_importance_fig = px.bar(
+    GBR_importance_df.head(15),
+    x="importance",
+    y="feature",
+    orientation="h",
+    title="Top-15 признаков"
+)
+st.plotly_chart(GBR_importance_fig, use_container_width=True)
+
+st.subheader("Важность признаков в AdaBoostRegressor")
+AdaRegression_importance_df = pd.DataFrame({
+    "feature": AdaRegression_model.X.columns,
+    "importance": AdaRegression_model.model.feature_importances_
+})
+AdaRegression_importance_df = AdaRegression_importance_df.sort_values(
+    "importance",
+    ascending=False
+)
+AdaRegression_importance_fig = px.bar(
+    AdaRegression_importance_df.head(15),
+    x="importance",
+    y="feature",
+    orientation="h",
+    title="Top-15 признаков"
+)
+st.plotly_chart(AdaRegression_importance_fig, use_container_width=True)
 
 with st.expander("Показать датасет"):
 
     st.dataframe(df.tail(100))
 
-with st.expander("Предсказания на test set"):
+with st.expander("Предсказания на test set в RandomForestRegressor"):
 
-    compare_df = pd.DataFrame({
-        "real": model.y_test.values,
-        "predicted": preds
+    RFR_compare_df = pd.DataFrame({
+        "real": RFR_model.y_test.values,
+        "predicted": RFR_preds
     })
 
-    st.dataframe(compare_df.head(50))
+    st.dataframe(RFR_compare_df.head(50))
 
-    compare_fig = px.line(
-        compare_df.head(100),
+    RFR_compare_fig = px.line(
+        RFR_compare_df.head(100),
         title="Real vs Predicted Volatility"
     )
 
-    st.plotly_chart(compare_fig, use_container_width=True)
+    st.plotly_chart(RFR_compare_fig, use_container_width=True)
+
+with st.expander("Предсказания на test set в GradientBoostRegressor"):
+    GBR_compare_df = pd.DataFrame({
+        "real": GBR_model.y_test.values,
+        "predicted": GBR_preds
+    })
+
+    st.dataframe(GBR_compare_df.head(50))
+
+    GBR_compare_fig = px.line(
+        GBR_compare_df.head(100),
+        title="Real vs Predicted Volatility"
+    )
+
+    st.plotly_chart(GBR_compare_fig, use_container_width=True)
+
+with st.expander("Предсказания на test set в AdaBoostRegressorRFR"):
+    AdaRegression_compare_df = pd.DataFrame({
+        "real": AdaRegression_model.y_test.values,
+        "predicted": AdaRegression_preds
+    })
+
+    st.dataframe(AdaRegression_compare_df.head(50))
+
+    AdaRegression_compare_fig = px.line(
+        AdaRegression_compare_df.head(100),
+        title="Real vs Predicted Volatility"
+    )
+
+    st.plotly_chart(AdaRegression_compare_fig, use_container_width=True)
+
+
+

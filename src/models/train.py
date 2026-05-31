@@ -1,11 +1,10 @@
 import os
 import pandas as pd
 import numpy as np
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, AdaBoostRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from dotenv import load_dotenv
 from sklearn.model_selection import TimeSeriesSplit
-
 
 load_dotenv()
 DATA_PATH = os.getenv("DATA_DIR") + "/data/preprocessed/final_dataset.csv"
@@ -14,14 +13,28 @@ PREDICT_DAYS = int(os.getenv("PREDICT_DAYS"))
 
 
 class PredictingModel:
-    def __init__(self, path: str, train_size=0.9, lag: int = 10):
+    def __init__(self, path: str, train_size=0.9, lag: int = 10, model_name: str = "RFR"):
         self.df = pd.read_csv(path)
         self.tscv = TimeSeriesSplit(n_splits=8)
-        self.model = RandomForestRegressor(
-            n_estimators=100,
-            max_depth=5,
-            random_state=42
-        )
+        self.model_name = model_name
+        if self.model_name == "RFR":
+            self.model = RandomForestRegressor(
+                n_estimators=200,
+                max_depth=7,
+                random_state=42
+            )
+        elif self.model_name == "GBR":
+            self.model = GradientBoostingRegressor(
+                n_estimators=100,
+                max_depth=5,
+                random_state=42
+            )
+        elif self.model_name == "AdaRegression":
+            self.model = AdaBoostRegressor(
+                n_estimators=100
+            )
+        else:
+            raise ValueError("Unknown predicting model")
         self.y = self.df["volatility_TCSG"]
         self.lag = lag
         columns = []
@@ -101,12 +114,24 @@ class PredictingModel:
             print(f"{name}: {val:.4f}")
 
 def main():
-    model = PredictingModel(DATA_PATH, lag=LAG_DAYS)
-    model.fit()
+    RFR_model = PredictingModel(DATA_PATH, lag=LAG_DAYS, model_name="RFR")
+    RFR_model.fit()
 
-    model.show_feature_importance()
+    RFR_model.show_feature_importance()
 
-    print(f"\nПредсказание волатильности на следующие {PREDICT_DAYS} дней:", model.predict_volatility(PREDICT_DAYS))
+    GBR_model = PredictingModel(DATA_PATH, lag=LAG_DAYS, model_name="GBR")
+    GBR_model.fit()
+
+    GBR_model.show_feature_importance()
+
+    AdaRegression_model = PredictingModel(DATA_PATH, lag=LAG_DAYS, model_name="AdaRegression")
+    AdaRegression_model.fit()
+
+    AdaRegression_model.show_feature_importance()
+
+    print(f"\nПредсказание волатильности на следующие {PREDICT_DAYS} дней на RFR:", RFR_model.predict_volatility(PREDICT_DAYS))
+    print(f"\nПредсказание волатильности на следующие {PREDICT_DAYS} дней на GBR:", GBR_model.predict_volatility(PREDICT_DAYS))
+    print(f"\nПредсказание волатильности на следующие {PREDICT_DAYS} дней на AdaRegression:", AdaRegression_model.predict_volatility(PREDICT_DAYS))
 
 if __name__ == "__main__":
     main()
